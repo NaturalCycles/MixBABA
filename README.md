@@ -1,6 +1,6 @@
 # MIXpanel Bayesian AB test Analysis tool (MixBABA)
 
-This tool is intended to consume a JSON file (example below) containing details about a Mixpanel funnel and output the results of the analysis made whithin a Bayesian framework.
+This tool is intended to consume a JSON file containing details about a Mixpanel funnel and output the results of the analysis made whithin a Bayesian framework.
 
 You can find details about the data processing [here](https://towardsdatascience.com/bayesian-a-b-testing-with-python-the-easy-guide-d638f89e0b8a).
 
