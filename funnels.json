@@ -1,0 +1,42 @@
+[ {"ID": 5150465,
+      "From Date": "2018-01-28",
+      "To Date": "2018-12-28",
+      "Impression field name": "AB-AB030-IMPRESSION",
+      "Conversion field name": "Payment",
+      "filters":
+                {"user.goal": ["PREVENT", "PLAN", "PREGNANT"],
+                "user.$country_code": ["US", "UK", "SE", "DE"],
+                "properties.view type": ["AndroidApp", "iOSApp", "WebApp", "Website"]}},
+  {"ID": 5160089,
+      "From Date": "2018-01-28", 
+      "To Date": "2018-12-28", 
+      "Impression field name": "AB-MONTHLYTHERM-IMPRESSION", 
+      "Conversion field name": "Payment",
+      "filters":
+                {"user.goal": ["PREVENT", "PLAN", "PREGNANT"],
+                "user.$country_code": ["US", "UK", "SE", "DE"],
+                "properties.view type": ["AndroidApp", "iOSApp", "WebApp", "Website"]}},
+
+  {"ID": 5088421,
+      "From Date": "2018-01-28",
+      "To Date": "2018-12-28",
+      "Impression field name": "AB-AB025-IMPRESSION",
+      "Conversion field name": "Payment",
+      "filters":
+                {"user.goal": ["PREVENT", "PLAN", "PREGNANT"],
+                "user.$country_code": ["US", "UK", "SE", "DE"],
+                "properties.view type": ["AndroidApp", "iOSApp", "WebApp", "Website"]}},
+
+  {"ID": 5162189,
+      "From Date": "2018-01-28",
+      "To Date": "2018-12-28",
+      "Impression field name": "AB-AB028-IMPRESSION",
+      "Conversion field name": "Payment",
+      "filters":
+                {"user.goal": ["PREVENT", "PLAN", "PREGNANT"],
+                "user.$country_code": ["US", "UK", "SE", "DE"],
+                "properties.view type": ["AndroidApp", "iOSApp", "WebApp", "Website"]}}
+
+]
+
+

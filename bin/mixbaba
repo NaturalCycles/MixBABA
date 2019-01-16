@@ -1,0 +1,96 @@
+#! /usr/bin/python
+
+from argparse import ArgumentParser
+import json
+import pandas as pd
+from mixbaba.mixbaba_utils import MixpanelAPI, get_funnels_list, analyze_funnel
+
+# parsing input arguments
+parser = ArgumentParser(description='Analyze AB funnels from Mixpanel')
+parser.add_argument("-v", "--verbosity", action="count", default=0,
+                    help="increase output verbosity (max: -vvv)")
+parser.add_argument("-o", "--output", help="The form in which you want to get the output",
+                    choices=["terminal", "csv", 'both'], default="terminal")
+parser.add_argument("-f", "--funnels", help="The JSON file with the details about the funnels to be analyzed",
+                    required=True)
+parser.add_argument("-k", "--key", help="The key to authenticate within Mixpanel",
+                    required=True)
+
+args = parser.parse_args()
+
+
+# opening Mixpanel API
+api: MixpanelAPI = MixpanelAPI(token=args.key)
+
+# getting the full list of funnels
+flist_df = get_funnels_list(api)
+
+print_res = True
+detailed_steps = False
+detailed_numbers = False
+if args.verbosity >= 3:
+    detailed_numbers = True
+    detailed_steps = True
+    print_res = True
+if args.verbosity >= 2:
+    detailed_steps = True
+    print_res = True
+elif args.verbosity >= 1:
+    print_res = True
+
+# loading the json file containing the details about the funnels to be analyzed
+funnels_json = args.funnels
+if detailed_steps:
+    print(f"loading funnels list from {funnels_json}")
+
+with open(funnels_json, 'r') as file:
+    funnels = json.load(file)
+
+for funnel_details in funnels:
+    output = []
+    ID = funnel_details['ID']
+    from_date = funnel_details['From Date']
+    to_date = funnel_details['To Date']
+    i_field = funnel_details['Impression field name']
+    c_field = funnel_details['Conversion field name']
+    filters = funnel_details['filters']
+    
+    # the overall behavior (no filters applied)
+    if detailed_steps:
+        print("--- --- Analyzing all data...")
+    result = analyze_funnel(api=api, funnel_id=ID, discriminant='None', cohort='All', from_date=from_date,
+                            to_date=to_date, i_field=i_field, c_field=c_field, detailed=detailed_numbers)
+    if detailed_steps:
+        print(f"--- --- --- --- {result['Comment']}")
+    output.append(result)
+    if result['Probability'] != 0:
+        # if the  result for the overall makes sense, we can filter it further
+
+        # the filtered results
+        for discriminant, cohorts in filters.items():
+            if detailed_steps:
+                print(f"--- --- Filtering by discriminant {discriminant}...")
+            for cohort in cohorts:
+                if detailed_steps:
+                    print(f"--- --- --- Analyzing cohort {cohort}...")
+                result = analyze_funnel(api=api, funnel_id=ID, discriminant=discriminant, cohort=cohort,
+                                        from_date=from_date, to_date=to_date, i_field=i_field, c_field=c_field,
+                                        detailed=detailed_numbers)
+                if detailed_steps:
+                    print(f"--- --- --- --- {result['Comment']}")
+                output.append(result)
+
+    # create a DataFrame for convenience
+    df = pd.DataFrame(output)
+    
+    # getting the name of the funnel
+    fun_name = flist_df.loc[ID]['name']
+    filename = f'{ID}-{fun_name}.csv'
+    
+    if args.output == "terminal" or args.output == "both":
+        print("-----------------------------------------------------")
+        print(f"Results for the funnel {ID} -- {fun_name}")
+        print(df)
+    if args.output == "csv" or args.output == "both":
+        print(f"results will be saved on the file {filename}")
+        df.to_csv(filename)
