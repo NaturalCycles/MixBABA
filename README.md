@@ -7,11 +7,11 @@ You can find details about the data processing [here](https://towardsdatascience
 ## Installation
 To install this package you have to clone the repository:
 
-    git clone blablabla
+    git clone https://github.com/NaturalCycles/MixBABA.git
     
 You can run the unit tests, to ensure the tool will work:
 
-    cd mixbaba 
+    cd MixBABA 
     python setup.py test
 
 And then you can install the tool via PIP:
