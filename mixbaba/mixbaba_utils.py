@@ -6,7 +6,6 @@ import pandas as pd
 from scipy.stats import beta
 from mixbaba.beta_utils import calc_prob_between
 import numpy as np
-import warnings
 
 
 class MixpanelAPI(object):
@@ -59,6 +58,7 @@ def get_funnels_list(connector: MixpanelAPI) -> pd.DataFrame:
     :param connector: the connector to the Mixpanel service
     :return: a pandas DataFrame
     """
+    # TODO: change dataframe to simple dict
     flist = connector.request(["funnels/list"], {})
     flist_df = pd.DataFrame(flist)
     flist_df.set_index('funnel_id', inplace=True)
@@ -126,7 +126,7 @@ def make_ab_analysis(imps_1: int, convs_1: int, imps_2: int, convs_2: int) -> (f
 
 
 def get_mixpanel_data(api: MixpanelAPI, funnel_id: int, from_date: str, to_date: str,
-                      discriminant: str, discr_type: str, cohort: str) -> dict:
+                      discriminant: str, discr_type: str, cohort: str, by: str) -> dict:
     """
     This function gather the data from Mixpanel using the API, eventually divided in cohort using a discriminant.
     :param api: the connector to the Mixpanel
@@ -136,14 +136,16 @@ def get_mixpanel_data(api: MixpanelAPI, funnel_id: int, from_date: str, to_date:
     :param discriminant: the discriminant to use to filter mixpanel data
     :param discr_type: to which category the discriminant belongs (e.g. user, properties, ...)
     :param cohort: the cohort to be selected within the discriminated ones
+    :param by: the string containing the value on which breakdown the cohorts
     :return: a dict with the data
     """
     # the aggregated data will be divided by 'assignment' property (i.e. control, test, etc)
+    breakdown_type, breakdown_val = by.split(".")
     req_dict = {
         "funnel_id": funnel_id,
         "from_date": from_date,
         "to_date": to_date,
-        "on": 'properties["assignment"]',
+        "on": f'{breakdown_type}["{breakdown_val}"]',
         'unit': 'month'
     }
     if discriminant != 'None':
@@ -155,8 +157,9 @@ def get_mixpanel_data(api: MixpanelAPI, funnel_id: int, from_date: str, to_date:
     return aggregate_mix_data(response_['data'])
 
 
-def analyze_funnel(api: MixpanelAPI, funnel_id: int, discriminant: str, cohort: str, from_date: str, to_date: str,
-                   i_field: str, c_field: str, prob_th: float = 0.95, detailed: bool = False) -> OrderedDict:
+def analyze_funnel(api: MixpanelAPI, funnel_id: int, discriminant: str, cohort: str,
+                   from_date: str, to_date: str, i_field: str, c_field: str, by: str,
+                   ab_groups: dict, prob_th: float = 0.95, detailed: bool = False) -> OrderedDict:
     """
     This function gather the data, makes the analysis and output the result for the given funnel.
     :param api: api: the connector to the Mixpanel
@@ -167,6 +170,8 @@ def analyze_funnel(api: MixpanelAPI, funnel_id: int, discriminant: str, cohort: 
     :param to_date: self explaining
     :param i_field: the field which denote the impressions within the dict
     :param c_field: the field which denote the conversions within the dict
+    :param by: the string containing the value on which breakdown the cohorts
+    :param ab_groups: a dict defining the Control and Test groups (optionally, the control2)
     :param prob_th: optional, the probability threshold to accept the hypothesis
     :param detailed: optional, if `True` will return also the original numbers extracted from mixpanel
     :return: an OrderedDict containing the processed data and (optionally, if `detailed=True`) the original data
@@ -175,20 +180,29 @@ def analyze_funnel(api: MixpanelAPI, funnel_id: int, discriminant: str, cohort: 
     output_template = OrderedDict({'Discriminant': discriminant, 'Cohort': cohort, 'CR improvement': 0,
                                    'Probability': 0, 'Comment': " "})
     if '.' in discriminant:
-        # if the discriminant is a real one ,composed by "family.discriminant"
+        # if the discriminant is a real one, composed by "family.discriminant"
         discr_type, discr_val = discriminant.split(".")
     else:
         discr_type, discr_val = discriminant, discriminant
-    aggregated_data = get_mixpanel_data(api=api, funnel_id=funnel_id, discriminant=discr_val, discr_type=discr_type,
-                                        cohort=cohort, from_date=from_date, to_date=to_date)
+    aggregated_data = get_mixpanel_data(api=api, funnel_id=funnel_id, from_date=from_date, to_date=to_date,
+                                        discriminant=discr_val, discr_type=discr_type, cohort=cohort, by=by)
+    control_group = ab_groups['Control']
+    test_group = ab_groups['Test']
+
+    control2_group = 'None'
+    control2_present = False
+    if "Control2" in ab_groups.keys():
+        control2_group = ab_groups['Control2']
+        control2_present = True
+
     try:
         # control
-        imps_ctrl = aggregated_data['control'][i_field]['count']
-        convs_ctrl = aggregated_data['control'][c_field]['count']
-        try:
+        imps_ctrl = aggregated_data[control_group][i_field]['count']
+        convs_ctrl = aggregated_data[control_group][c_field]['count']
+        if control2_present:
             # control2
-            imps_ctrl2 = aggregated_data['control2'][i_field]['count']
-            convs_ctrl2 = aggregated_data['control2'][c_field]['count']
+            imps_ctrl2 = aggregated_data[control2_group][i_field]['count']
+            convs_ctrl2 = aggregated_data[control2_group][c_field]['count']
             if convs_ctrl < 1 or convs_ctrl2 < 1:
                 output_template['Comment'] = "Too few data!"
                 if detailed:
@@ -210,11 +224,9 @@ def analyze_funnel(api: MixpanelAPI, funnel_id: int, discriminant: str, cohort: 
                         output_template['Test Impressions'] = 0
                         output_template['Test Conversions'] = 0
                     return output_template
-        except KeyError:
-            None
         # Test
-        imps_test = aggregated_data['test'][i_field]['count']
-        convs_test = aggregated_data['test'][c_field]['count']
+        imps_test = aggregated_data[test_group][i_field]['count']
+        convs_test = aggregated_data[test_group][c_field]['count']
         if detailed:
             output_template['Control Impressions'] = imps_ctrl
             output_template['Control Conversions'] = convs_ctrl

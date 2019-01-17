@@ -3,6 +3,8 @@
       "To Date": "2018-12-28",
       "Impression field name": "AB-AB030-IMPRESSION",
       "Conversion field name": "Payment",
+      "By": "properties.assignment",
+      "AB Groups": {"Control":"control", "Test": "test", "Control2": "control2"},
       "filters":
                 {"user.goal": ["PREVENT", "PLAN", "PREGNANT"],
                 "user.$country_code": ["US", "UK", "SE", "DE"],
@@ -12,6 +14,8 @@
       "To Date": "2018-12-28", 
       "Impression field name": "AB-MONTHLYTHERM-IMPRESSION", 
       "Conversion field name": "Payment",
+      "By": "properties.assignment",
+      "AB Groups": {"Control":"control", "Test": "test", "Control2": "control2"},
       "filters":
                 {"user.goal": ["PREVENT", "PLAN", "PREGNANT"],
                 "user.$country_code": ["US", "UK", "SE", "DE"],
@@ -22,6 +26,8 @@
       "To Date": "2018-12-28",
       "Impression field name": "AB-AB025-IMPRESSION",
       "Conversion field name": "Payment",
+      "By": "properties.assignment",
+      "AB Groups": {"Control":"control", "Test": "test", "Control2": "control2"},
       "filters":
                 {"user.goal": ["PREVENT", "PLAN", "PREGNANT"],
                 "user.$country_code": ["US", "UK", "SE", "DE"],
@@ -32,6 +38,8 @@
       "To Date": "2018-12-28",
       "Impression field name": "AB-AB028-IMPRESSION",
       "Conversion field name": "Payment",
+      "By": "properties.assignment",
+      "AB Groups": {"Control":"control", "Test": "test", "Control2": "control2"},
       "filters":
                 {"user.goal": ["PREVENT", "PLAN", "PREGNANT"],
                 "user.$country_code": ["US", "UK", "SE", "DE"],
