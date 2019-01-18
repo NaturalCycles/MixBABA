@@ -43,7 +43,16 @@
       "filters":
                 {"user.goal": ["PREVENT", "PLAN", "PREGNANT"],
                 "user.$country_code": ["US", "UK", "SE", "DE"],
-                "properties.view type": ["AndroidApp", "iOSApp", "WebApp", "Website"]}}
+                "properties.view type": ["AndroidApp", "iOSApp", "WebApp", "Website"]}},
+  {"ID": 5397671,
+      "From Date": "2018-01-28",
+      "To Date": "2018-12-28",
+      "Impression field name": "AB-AB025-IMPRESSION",
+      "Conversion field name": "Payment",
+      "By": "properties.action",
+      "AB Groups": {"Control":"ShopItem", "Test": "RegMonthly"},
+      "filters":
+                {"properties.assignment": ["control", "test", "control2"]}}
 
 ]
 
