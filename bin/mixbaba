@@ -2,7 +2,7 @@
 
 from argparse import ArgumentParser
 import json
-from mixbaba.mixbaba_utils import MixpanelAPI, get_funnels_list, analyze_funnel
+from mixbaba.mixbaba_utils import MixpanelAPI, get_funnels_list, analyze_funnel2
 from mixbaba.output_utils import return_output
 
 # parsing input arguments
@@ -40,8 +40,7 @@ if detailed_steps:
 with open(funnels_json, 'r') as file:
     funnels = json.load(file)
 
-
-for funnel_details in funnels:
+'''for funnel_details in funnels:
     ID = funnel_details['ID']
 
     # getting the name of the funnel
@@ -86,5 +85,59 @@ for funnel_details in funnels:
                 output.append(result)
 
     #finally, returning the output
-    return_output(what=output, where=args.output, f_id=ID, ab_groups=ab_groups, fun_name=fun_name)
+    return_output(what=output, where=args.output, f_id=ID, ab_groups=ab_groups, fun_name=fun_name)'''
 
+for funnel_details in funnels:
+    ID = funnel_details['ID']
+
+    # getting the name of the funnel
+    fun_name = flist_df.loc[ID]['name']
+
+    # sanity check
+    if ("AB Groups" not in funnel_details.keys()) or ('Control' not in funnel_details["AB Groups"].keys()) or \
+            ('Test' not in funnel_details["AB Groups"].keys()):
+        # print(funnel_details)
+        raise KeyError(f'Control or Test group names not found in funnel {ID} : {fun_name}')
+    output = []
+    # from_date = funnel_details['From Date']
+    # to_date = funnel_details['To Date']
+    # i_field = funnel_details['Impression field name']
+    # c_field = funnel_details['Conversion field name']
+    # by = funnel_details['By']
+    # ab_groups = funnel_details['AB Groups']
+    filters = funnel_details['filters']
+    # the overall behavior (no filters applied)
+    if detailed_steps:
+        print("--- --- Analyzing all data...")
+    # result = analyze_funnel(api=api, funnel_id=ID, discriminant='None', cohort='All', from_date=from_date,
+    #                        to_date=to_date, i_field=i_field, c_field=c_field, by=by, ab_groups=ab_groups,
+    #                        detailed=detailed_numbers)
+
+    # TODO: here ID is useless
+    result = analyze_funnel2(api=api, funnel_id=ID, discriminant='None', cohort='All', funnel_details=funnel_details,
+                             detailed=detailed_numbers)
+    if detailed_steps:
+        print(f"--- --- --- --- {result['Comment']}")
+    output.append(result)
+    if result['Probability'] > 0.:
+        # if the  result for the overall makes sense, we can filter it further
+
+        for discriminant, cohorts in filters.items():
+            if detailed_steps:
+                print(f"--- --- Filtering by discriminant {discriminant}...")
+            for cohort in cohorts:
+                if detailed_steps:
+                    print(f"--- --- --- Analyzing cohort {cohort}...")
+                # result = analyze_funnel(api=api, funnel_id=ID, discriminant=discriminant, cohort=cohort,
+                #                        from_date=from_date, to_date=to_date, i_field=i_field, c_field=c_field,
+                #                        by=by, ab_groups=ab_groups, detailed=detailed_numbers)
+                result = analyze_funnel2(api=api, funnel_id=ID, discriminant=discriminant, cohort=cohort,
+                                         funnel_details=funnel_details, detailed=detailed_numbers)
+
+                if detailed_steps:
+                    print(f"--- --- --- --- {result['Comment']}")
+                output.append(result)
+
+    # finally, returning the output
+    ab_groups = funnel_details['AB Groups']
+    return_output(what=output, where=args.output, f_id=ID, ab_groups=ab_groups, fun_name=fun_name)
