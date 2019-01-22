@@ -125,7 +125,7 @@ def make_ab_analysis(imps_1: int, convs_1: int, imps_2: int, convs_2: int) -> (f
     return lift, prob
 
 
-def get_mixpanel_data(api: MixpanelAPI, funnel_id: int, from_date: str, to_date: str,
+'''def get_mixpanel_data(api: MixpanelAPI, funnel_id: int, from_date: str, to_date: str,
                       discriminant: str, discr_type: str, cohort: str, by: str) -> dict:
     """
     This function gather the data from Mixpanel using the API, eventually divided in cohort using a discriminant.
@@ -155,10 +155,10 @@ def get_mixpanel_data(api: MixpanelAPI, funnel_id: int, from_date: str, to_date:
 
     # since by default the data is divided per month, we need to aggregate it
     return aggregate_mix_data(response_['data'])
+'''
 
 
-def get_mixpanel_data2(api: MixpanelAPI, funnel_id: int, from_date: str, to_date: str,
-                       filters: {}, by: str) -> dict:
+def get_mixpanel_data(api: MixpanelAPI, funnel_id: int, from_date: str, to_date: str, filters: {}, by: str) -> dict:
     """
     This function gather the data from Mixpanel using the API, eventually divided in cohort using a discriminant.
     :param api: the connector to the Mixpanel
@@ -166,6 +166,7 @@ def get_mixpanel_data2(api: MixpanelAPI, funnel_id: int, from_date: str, to_date
     :param from_date: self explaining, string formatted like "2018-01-28"
     :param to_date: self explaining
     :param filters: a dict with the filters to be used in this operation
+     (ex. {'properties.assignment': 'control'}, or for no filters {'None': 'All'})
     :param by: the string containing the value on which breakdown the cohorts
     :return: a dict with the data
     """
@@ -185,7 +186,8 @@ def get_mixpanel_data2(api: MixpanelAPI, funnel_id: int, from_date: str, to_date
                 if i_filt > 0:
                     req_filt += " and "
                 discr_type, discriminant = filt_type.split('.')
-                req_filt += f'("{cohort}" in {discr_type}["{discriminant}"]) and (defined ({discr_type}["{discriminant}"]))'
+                req_filt += f'("{cohort}" in {discr_type}["{discriminant}"]) ' \
+                    f'and (defined ({discr_type}["{discriminant}"]))'
         req_dict["where"] = req_filt
     response_ = api.request(["funnels"], req_dict)
 
@@ -295,13 +297,6 @@ def analyze_funnel(api: MixpanelAPI, funnel_id: int, discriminant: str, cohort: 
         return output_template'''
 
 
-'''def get_breakdowns(api: MixpanelAPI,  funnel_id=funnel_id, discriminant: str, cohort: str) :
-    aggregated_data = get_mixpanel_data(api=api, funnel_id=funnel_id, from_date=from_date, to_date=to_date,
-                                        discriminant=discr_val, discr_type=discr_type, cohort=cohort, by=by)
-    return aggregated_data'''
-
-
-
 def return_zeros_brk(output_template: dict, ab_groups: dict) ->dict:
     for ab_group in ab_groups.values():
         output_template[ab_group + " -- conversions details"] = "None"
@@ -315,7 +310,8 @@ def return_zeros_det(output_template: dict) ->dict:
     output_template['Test Conversions'] = 0
     return output_template
 
-def fill_template(comment: str, output_template: dict, funnel_details: dict, detailed: bool):
+
+def fill_template(comment: str, output_template: OrderedDict, funnel_details: dict, detailed: bool) -> OrderedDict:
     output_template['Comment'] = comment
     if 'Breakdowns' in funnel_details.keys():
         ab_groups = funnel_details['AB Groups']
@@ -325,12 +321,11 @@ def fill_template(comment: str, output_template: dict, funnel_details: dict, det
     return output_template
 
 
-def analyze_funnel2(api: MixpanelAPI, funnel_id: int, discriminant: str, cohort: str, funnel_details: dict,
+def analyze_funnel(api: MixpanelAPI, discriminant: str, cohort: str, funnel_details: dict,
                     prob_th: float = 0.95, detailed: bool = False) -> OrderedDict:
     """
     This function gather the data, makes the analysis and output the result for the given funnel.
     :param api: api: the connector to the Mixpanel
-    :param funnel_id: the funnel identifier
     :param discriminant: the discriminant to use to filter mixpanel data
     :param cohort: the cohort to be selected within the discriminated ones
     :param funnel_details: the dict with the details of the funnel
@@ -339,6 +334,7 @@ def analyze_funnel2(api: MixpanelAPI, funnel_id: int, discriminant: str, cohort:
     :return: an OrderedDict containing the processed data and (optionally, if `detailed=True`) the original data
     """
     # TODO: add cross-filtering selection (ex. Goal together with Country, etc)
+    funnel_id = funnel_details['ID']
     from_date = funnel_details['From Date']
     to_date = funnel_details['To Date']
     i_field = funnel_details['Impression field name']
@@ -348,16 +344,22 @@ def analyze_funnel2(api: MixpanelAPI, funnel_id: int, discriminant: str, cohort:
 
     output_template = OrderedDict({'Discriminant': discriminant, 'Cohort': cohort, 'CR improvement': 0,
                                    'Probability': 0, 'Comment': " "})
-    if '.' in discriminant:
+    '''if '.' in discriminant:
         # if the discriminant is a real one, composed by "family.discriminant"
         discr_type, discr_val = discriminant.split(".")
     else:
         discr_type, discr_val = discriminant, discriminant
     aggregated_data = get_mixpanel_data(api=api, funnel_id=funnel_id, from_date=from_date, to_date=to_date,
-                                        discriminant=discr_val, discr_type=discr_type, cohort=cohort, by=by)
+                                        discriminant=discr_val, discr_type=discr_type, cohort=cohort, by=by)'''
+
+    filters = {discriminant: cohort}
+    aggregated_data = get_mixpanel_data(api=api, funnel_id=funnel_id, from_date=from_date, to_date=to_date,
+                                        filters=filters, by=by)
+
     control_group = ab_groups['Control']
     test_group = ab_groups['Test']
 
+    # initialize as if we have not control2 group
     control2_group = 'None'
     control2_present = False
     if "Control2" in ab_groups.keys():
@@ -423,14 +425,13 @@ def analyze_funnel2(api: MixpanelAPI, funnel_id: int, discriminant: str, cohort:
                 filters = {by: ab_group}
                 for brk_type, _ in funnel_details['Breakdowns'].items():
                     filters[discriminant] = cohort
-                    aggregated_data = get_mixpanel_data2(api=api, funnel_id=funnel_id, from_date=from_date, to_date=to_date,
-                                             filters=filters, by=brk_type)
+                    aggregated_data = get_mixpanel_data(api=api, funnel_id=funnel_id, from_date=from_date,
+                                                        to_date=to_date, filters=filters, by=brk_type)
                     conversions = {}
                     for d_key, d_val in aggregated_data.items():
-                        conversions[d_key]=d_val[c_field]['count']
+                        conversions[d_key] = d_val[c_field]['count']
                     output_template[ab_group + " -- conversions details"] = conversions
 
         output_template['CR improvement'] = cr
         output_template['Probability'] = prob
         return output_template
-

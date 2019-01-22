@@ -1,4 +1,7 @@
 import pandas as pd
+from tqdm import tqdm
+from tabulate import tabulate
+
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -10,27 +13,69 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 
-def print_form(str2print: str, how='b') -> str:
-    if how=='b':
+def print_form(str2print, how='b') -> str:
+    if how == 'b':
         return f"{bcolors.BOLD}{str2print}{bcolors.ENDC}"
 
 
-def return_output(what: list, where: str, f_id: int, ab_groups: dict, fun_name: str):
+def return_long_output(what: list, where: str, f_id: int, ab_groups: dict, fun_name: str):
     # create a DataFrame for convenience
     df = pd.DataFrame(what)
 
     if where == "terminal" or where == "both":
-        print("-----------------------------------------------------")
-        print(f"Results for the funnel {print_form(f_id)} -- {print_form(fun_name)}")
+        tqdm.write("-----------------------------------------------------")
+        tqdm.write(f"Results for the funnel {print_form(f_id)} -- {print_form(fun_name)}")
         if 'Control2' in ab_groups.keys():
-            print(f"Control group is: {print_form(ab_groups['Control'])}, "
+            tqdm.write(f"Control group is: {print_form(ab_groups['Control'])}, "
                   f"second Control group is: {print_form(ab_groups['Control2'])},"
                   f" test group is {print_form(ab_groups['Test'])}")
         else:
-            print(f"Control group is: {print_form(ab_groups['Control'])}, "
+            tqdm.write(f"Control group is: {print_form(ab_groups['Control'])}, "
                   f"test group is {print_form(ab_groups['Test'])}")
-        print(df)
+        tqdm.write(tabulate(df))
     if where == "csv" or where == "both":
         filename = f'{f_id}-{fun_name}.csv'
-        print(f"results will be saved on the file {filename}")
+        tqdm.write(f"results will be saved on the file {filename}")
         df.to_csv(filename)
+
+
+def create_group(row):
+    if row['Discriminant'] == 'None':
+        return 'All.'+row['Cohort']
+    else:
+        return row['Discriminant'].split('.')[1] + "." + row['Cohort']
+
+
+def return_short_output(what, where, f_id, ab_groups, fun_name):
+    # create a DataFrame for convenience
+    df = pd.DataFrame(what)
+    df['Group'] = df.apply(lambda row: create_group(row), axis=1)
+
+    df.drop(columns=['Comment', 'Discriminant', 'Cohort'], inplace=True)
+    cols = df.columns.tolist()
+    cols = cols[-1:] + cols[:-1]
+    df = df[cols]
+
+    if where == "terminal" or where == "both":
+        tqdm.write("-----------------------------------------------------")
+        tqdm.write(f"Results for the funnel {print_form(f_id)} -- {print_form(fun_name)}")
+        if 'Control2' in ab_groups.keys():
+            tqdm.write(f"Control group is: {print_form(ab_groups['Control'])}, "
+                  f"second Control group is: {print_form(ab_groups['Control2'])},"
+                  f" test group is {print_form(ab_groups['Test'])}")
+        else:
+            tqdm.write(f"Control group is: {print_form(ab_groups['Control'])}, "
+                  f"test group is {print_form(ab_groups['Test'])}")
+        tqdm.write(tabulate(df))
+    if where == "csv" or where == "both":
+        filename = f'{f_id}-{fun_name}.csv'
+        tqdm.write(f"results will be saved on the file {filename}")
+        df.to_csv(filename)
+    pass
+
+
+def return_output(what: list, where: str, how: str, f_id: int, ab_groups: dict, fun_name: str):
+    if how == 'long':
+        return_long_output(what=what, where=where, f_id=f_id, ab_groups=ab_groups, fun_name=fun_name)
+    elif how == 'short':
+        return_short_output(what=what, where=where, f_id=f_id, ab_groups=ab_groups, fun_name=fun_name)
