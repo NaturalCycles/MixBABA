@@ -6,6 +6,7 @@ import pandas as pd
 from scipy.stats import beta
 from mixbaba.beta_utils import calc_prob_between
 import numpy as np
+import warnings
 
 
 class MixpanelAPI(object):
@@ -181,8 +182,47 @@ def fill_template(comment: str, output_template: OrderedDict, funnel_details: di
     if 'Breakdowns' in funnel_details.keys():
         ab_groups = funnel_details['AB Groups']
         output_template = return_zeros_brk(output_template, ab_groups=ab_groups)
-    output_template = return_zeros_det(output_template)
+    # output_template = return_zeros_det(output_template)
     return output_template
+
+
+def extract_ab_group_names(extracted_ab):
+    """
+    This function extract the names of the control groups (up to 2) and test groups (up to five).
+    Note that here the naming convention allows only keywords `control`, `controlN`, `test`, `testN`, with N integer
+    :param extracted_ab: the list of the groups
+    :return: two lists: one for the control groups, the other for the test groups
+    """
+    control_groups = []
+    test_groups = []
+
+    for group in extracted_ab:
+        splitted_group_c = group.split('control')
+        if len(splitted_group_c) > 1:
+            if splitted_group_c[1] == '':
+                control_groups.append(group)
+            else:
+                try:
+                    gr_n = int(splitted_group_c[1])
+                    if gr_n > 2:
+                        warnings.warn("Ignoring the group %s" % group)
+                    control_groups.append(group)
+                except ValueError:
+                    warnings.warn("Ignoring the group %s" % group)
+        else:
+            splitted_group_t = group.split('test')
+            if len(splitted_group_t) > 1:
+                if splitted_group_t[1] == '':
+                    test_groups.append(group)
+                else:
+                    try:
+                        gr_n = int(splitted_group_t[1])
+                        if gr_n > 5:
+                            warnings.warn("Ignoring the group %s" % group)
+                        test_groups.append(group)
+                    except ValueError:
+                        warnings.warn("Ignoring the group %s" % group)
+    return control_groups, test_groups
 
 
 def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
@@ -201,7 +241,12 @@ def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
     i_field = funnel_details['Impression field name']
     c_field = funnel_details['Conversion field name']
     by = funnel_details['By']
-    ab_groups = funnel_details['AB Groups']
+    manual_ab_names = True
+    ab_groups = {}
+    try:
+        ab_groups = funnel_details['AB Groups']
+    except KeyError:
+        manual_ab_names = False
 
     discriminant = ""
     cohort = ""
@@ -211,88 +256,101 @@ def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
             cohort += '+'
         discriminant += discriminant_
         cohort += cohort_
-    output_template = OrderedDict({'Discriminant': discriminant, 'Cohort': cohort, 'CR improvement': 0,
-                                   'Probability': 0, 'Comment': " "})
+    output_template = OrderedDict({'Discriminant': discriminant, 'Cohort': cohort, 'Comment': " "})
 
     aggregated_data = get_mixpanel_data(api=api, funnel_id=funnel_id, from_date=from_date, to_date=to_date,
                                         filters=filters, by=by)
 
-    control_group = ab_groups['Control']
-    test_group = ab_groups['Test']
-
     # initialize as if we have not control2 group
+    control_group = 'None'
     control2_group = 'None'
     control2_present = False
-    if "Control2" in ab_groups.keys():
-        control2_group = ab_groups['Control2']
-        control2_present = True
+    if manual_ab_names:
+        control_group = ab_groups['Control']
+        # TODO foresee a manual selection of test groups
+        _test_group = ab_groups['Test']
+        test_groups = [_test_group]
+        if "Control2" in ab_groups.keys():
+            control2_group = ab_groups['Control2']
+            control2_present = True
+    else:
+        extracted_ab = aggregated_data.keys()
+        control_groups, test_groups = extract_ab_group_names(extracted_ab)
+        if len(control_groups) > 2:
+            control_group = 'control'
+            control2_group = 'control2'
+            control2_present = True
 
     try:
         # control
         imps_ctrl = aggregated_data[control_group][i_field]['count']
         convs_ctrl = aggregated_data[control_group][c_field]['count']
-        if convs_ctrl < 1:
-            output_template = fill_template(comment="Too few data for control option!",
-                                            output_template=output_template, funnel_details=funnel_details)
-            return output_template
-        if control2_present:
-            # control2
-            imps_ctrl2 = aggregated_data[control2_group][i_field]['count']
-            convs_ctrl2 = aggregated_data[control2_group][c_field]['count']
-
-            if convs_ctrl2 < 1:
-                print("uno")
-                output_template = fill_template(comment="Too few data for second control option!",
-                                                output_template=output_template, funnel_details=funnel_details)
-                return output_template
-            else:
-                cr, prob = make_ab_analysis(imps_ctrl, convs_ctrl, imps_ctrl2, convs_ctrl2)
-                if np.abs(prob - 0.5) < 0.40:  # 0.40 Number to be studied!!
-                    imps_ctrl += imps_ctrl2
-                    convs_ctrl += convs_ctrl2
-                else:
-                    print("due")
-                    output_template = fill_template(comment="Too few data for second control option!",
-                                                    output_template=output_template, funnel_details=funnel_details)
-
-                    return output_template
-        # Test
-        imps_test = aggregated_data[test_group][i_field]['count']
-        convs_test = aggregated_data[test_group][c_field]['count']
-        output_template['Control Impressions'] = imps_ctrl
-        output_template['Control Conversions'] = convs_ctrl
-        output_template['Test Impressions'] = imps_test
-        output_template['Test Conversions'] = convs_test
     except KeyError:
         output_template = fill_template(comment="Too few data!",
                                         output_template=output_template, funnel_details=funnel_details)
         return output_template
-    if convs_ctrl < 1 or convs_test < 1:
-        output_template = fill_template(comment="Too few data!",
+    if convs_ctrl < 1:
+        output_template = fill_template(comment="Too few data for control option!",
                                         output_template=output_template, funnel_details=funnel_details)
         return output_template
-    else:
-        cr, prob = make_ab_analysis(imps_ctrl, convs_ctrl, imps_test, convs_test)
-        if prob > prob_th:
-            output_template['Comment'] = 'Result is OK!'
-        else:
-            output_template['Comment'] = 'Result is uncertain! Check data'
-        if 'Breakdowns' in funnel_details.keys():
-            for ab_group in ab_groups.values():
-                # 'By' become a filter:
-                filters = {by: ab_group}
-                for brk_type, _ in funnel_details['Breakdowns'].items():
-                    filters[discriminant] = cohort
-                    aggregated_data = get_mixpanel_data(api=api, funnel_id=funnel_id, from_date=from_date,
-                                                        to_date=to_date, filters=filters, by=brk_type)
-                    conversions = {}
-                    for d_key, d_val in aggregated_data.items():
-                        conversions[d_key] = d_val[c_field]['count']
-                    output_template[ab_group + " -- conversions details"] = conversions
+    if control2_present:
+        # control2
+        imps_ctrl2 = aggregated_data[control2_group][i_field]['count']
+        convs_ctrl2 = aggregated_data[control2_group][c_field]['count']
 
-        output_template['CR improvement'] = cr
-        output_template['Probability'] = prob
-        return output_template
+        if convs_ctrl2 < 1:
+            output_template = fill_template(comment="Too few data for second control option!",
+                                            output_template=output_template, funnel_details=funnel_details)
+            return output_template
+        else:
+            cr, prob = make_ab_analysis(imps_ctrl, convs_ctrl, imps_ctrl2, convs_ctrl2)
+            if np.abs(prob - 0.5) < 0.40:  # 0.40 Number to be studied!!
+                imps_ctrl += imps_ctrl2
+                convs_ctrl += convs_ctrl2
+            else:
+                output_template = fill_template(comment="Too few data for second control option!",
+                                                output_template=output_template, funnel_details=funnel_details)
+
+                return output_template
+
+    output_template['Control Impressions'] = imps_ctrl
+    output_template['Control Conversions'] = convs_ctrl
+    comment = ""
+    # Tests groups
+    for test_g_name in test_groups:
+        imps_test = aggregated_data[test_g_name][i_field]['count']
+        convs_test = aggregated_data[test_g_name][c_field]['count']
+        output_template['%s Impressions' % test_g_name] = imps_test
+        output_template['%s Conversions' % test_g_name] = convs_test
+
+        if convs_test < 1:
+            comment += "Too few data for %s!" % test_g_name,
+            # TODO: check what happens with breakdowns!
+            # output_template = fill_template(comment="Too few data!",
+            #                                     output_template=output_template, funnel_details=funnel_details)
+            # output_template{}
+        else:
+            cr, prob = make_ab_analysis(imps_ctrl, convs_ctrl, imps_test, convs_test)
+            if prob > prob_th:
+                output_template['Comment'] += 'Result for %s is OK! ' % test_g_name
+            else:
+                output_template['Comment'] += 'Result for %s is uncertain.' % test_g_name
+            if 'Breakdowns' in funnel_details.keys():
+                for ab_group in ab_groups.values():
+                    # 'By' become a filter:
+                    filters = {by: ab_group}
+                    for brk_type, _ in funnel_details['Breakdowns'].items():
+                        filters[discriminant] = cohort
+                        aggregated_data = get_mixpanel_data(api=api, funnel_id=funnel_id, from_date=from_date,
+                                                            to_date=to_date, filters=filters, by=brk_type)
+                        conversions = {}
+                        for d_key, d_val in aggregated_data.items():
+                            conversions[d_key] = d_val[c_field]['count']
+                        output_template[ab_group + " -- conversions details"] = conversions
+
+            output_template['%s CR improvement' % test_g_name] = cr
+            output_template['%s Probability' % test_g_name] = prob
+    return output_template
 
 
 def get_combinations(filters: dict) -> list:

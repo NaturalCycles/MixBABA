@@ -50,7 +50,8 @@ for funnel_details in tqdm(funnels, desc="Funnels completition"):
     # sanity check
     if ("AB Groups" not in funnel_details.keys()) or ('Control' not in funnel_details["AB Groups"].keys()) or \
             ('Test' not in funnel_details["AB Groups"].keys()):
-        raise KeyError(f'Control or Test group names not found in funnel {ID} : {fun_name}')
+        if detailed_steps:
+            tqdm.write("--- Assuming Control(s) and Test(s) groups follow the convention")
     output = []
 
     # the overall behavior (no filters applied)
@@ -61,29 +62,28 @@ for funnel_details in tqdm(funnels, desc="Funnels completition"):
     if detailed_steps:
         tqdm.write(f"--- --- --- --- {result['Comment']}")
     output.append(result)
-    if result['Probability'] > 0.:
-        # if the  result for the overall makes sense, we can filter it further
-        filters = funnel_details['filters']
-        for discriminant, cohorts in tqdm(filters.items(), desc="Discriminants for this funnel"):
+
+    filters = funnel_details['filters']
+    for discriminant, cohorts in tqdm(filters.items(), desc="Discriminants for this funnel"):
+        if detailed_steps:
+            tqdm.write(f"--- --- Filtering by discriminant {discriminant}...")
+        for cohort in tqdm(cohorts, desc="Cohorts for this discriminant"):
             if detailed_steps:
-                tqdm.write(f"--- --- Filtering by discriminant {discriminant}...")
-            for cohort in tqdm(cohorts, desc="Cohorts for this discriminant"):
-                if detailed_steps:
-                    tqdm.write(f"--- --- --- Analyzing cohort {cohort}...")
-                filters2apply = {discriminant: cohort}
-                result = analyze_funnel(api=api, filters=filters2apply, funnel_details=funnel_details)
+                tqdm.write(f"--- --- --- Analyzing cohort {cohort}...")
+            filters2apply = {discriminant: cohort}
+            result = analyze_funnel(api=api, filters=filters2apply, funnel_details=funnel_details)
 
-                if detailed_steps:
-                    tqdm.write(f"--- --- --- --- {result['Comment']}")
-                output.append(result)
+            if detailed_steps:
+                tqdm.write(f"--- --- --- --- {result['Comment']}")
+            output.append(result)
 
-        if args.crossed_filters:
-            # analyzing combinations of the filters
-            combinations = get_combinations(filters)
-            for filters2apply in tqdm(combinations, desc="Crossing filters"):
-                # TODO: take memory of filters with too few data, it's useless to continue run on them
-                result = analyze_funnel(api=api, filters=filters2apply, funnel_details=funnel_details)
-                output.append(result)
+    if args.crossed_filters:
+        # analyzing combinations of the filters
+        combinations = get_combinations(filters)
+        for filters2apply in tqdm(combinations, desc="Crossing filters"):
+            # TODO: take memory of filters with too few data, it's useless to continue run on them
+            result = analyze_funnel(api=api, filters=filters2apply, funnel_details=funnel_details)
+            output.append(result)
 
     # finally, returning the output
     ab_groups = funnel_details['AB Groups']
