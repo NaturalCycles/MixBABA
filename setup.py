@@ -33,6 +33,8 @@ setuptools.setup(
         "numba",
         "matplotlib",
         "scipy",
+        "tqdm",
+        "tabulate"
     ],
 
     tests_require=['nose'],
