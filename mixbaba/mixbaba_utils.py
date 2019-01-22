@@ -186,13 +186,12 @@ def fill_template(comment: str, output_template: OrderedDict, funnel_details: di
     return output_template
 
 
-def analyze_funnel(api: MixpanelAPI, discriminant: str, cohort: str, funnel_details: dict,
+def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
                    prob_th: float = 0.95, detailed: bool = False) -> OrderedDict:
     """
     This function gather the data, makes the analysis and output the result for the given funnel.
-    :param api: api: the connector to the Mixpanel
-    :param discriminant: the discriminant to use to filter mixpanel data
-    :param cohort: the cohort to be selected within the discriminated ones
+    :param api: the connector to the Mixpanel
+    :param filters: the filters to be used in this analysis
     :param funnel_details: the dict with the details of the funnel
     :param prob_th: optional, the probability threshold to accept the hypothesis
     :param detailed: optional, if `True` will return also the original numbers extracted from mixpanel
@@ -207,6 +206,10 @@ def analyze_funnel(api: MixpanelAPI, discriminant: str, cohort: str, funnel_deta
     by = funnel_details['By']
     ab_groups = funnel_details['AB Groups']
 
+    #filters = {discriminant: cohort}
+    for filter, cohorts in filters.items():
+
+    discriminant, cohort # e per i coressed filters, coas facciamo nella tabella?
     output_template = OrderedDict({'Discriminant': discriminant, 'Cohort': cohort, 'CR improvement': 0,
                                    'Probability': 0, 'Comment': " "})
     '''if '.' in discriminant:
@@ -217,7 +220,6 @@ def analyze_funnel(api: MixpanelAPI, discriminant: str, cohort: str, funnel_deta
     aggregated_data = get_mixpanel_data(api=api, funnel_id=funnel_id, from_date=from_date, to_date=to_date,
                                         discriminant=discr_val, discr_type=discr_type, cohort=cohort, by=by)'''
 
-    filters = {discriminant: cohort}
     aggregated_data = get_mixpanel_data(api=api, funnel_id=funnel_id, from_date=from_date, to_date=to_date,
                                         filters=filters, by=by)
 
@@ -246,6 +248,7 @@ def analyze_funnel(api: MixpanelAPI, discriminant: str, cohort: str, funnel_deta
             convs_ctrl2 = aggregated_data[control2_group][c_field]['count']
 
             if convs_ctrl2 < 1:
+                print("uno")
                 output_template = fill_template(comment="Too few data for second control option!",
                                                 output_template=output_template, funnel_details=funnel_details,
                                                 detailed=detailed)
@@ -256,6 +259,7 @@ def analyze_funnel(api: MixpanelAPI, discriminant: str, cohort: str, funnel_deta
                     imps_ctrl += imps_ctrl2
                     convs_ctrl += convs_ctrl2
                 else:
+                    print("due")
                     output_template = fill_template(comment="Too few data for second control option!",
                                                     output_template=output_template, funnel_details=funnel_details,
                                                     detailed=detailed)
