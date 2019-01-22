@@ -176,26 +176,24 @@ def return_zeros_det(output_template: dict) ->dict:
     return output_template
 
 
-def fill_template(comment: str, output_template: OrderedDict, funnel_details: dict, detailed: bool) -> OrderedDict:
+def fill_template(comment: str, output_template: OrderedDict, funnel_details: dict) -> OrderedDict:
     output_template['Comment'] = comment
     if 'Breakdowns' in funnel_details.keys():
         ab_groups = funnel_details['AB Groups']
         output_template = return_zeros_brk(output_template, ab_groups=ab_groups)
-    if detailed:
-        output_template = return_zeros_det(output_template)
+    output_template = return_zeros_det(output_template)
     return output_template
 
 
 def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
-                   prob_th: float = 0.95, detailed: bool = False) -> OrderedDict:
+                   prob_th: float = 0.95) -> OrderedDict:
     """
     This function gather the data, makes the analysis and output the result for the given funnel.
     :param api: the connector to the Mixpanel
     :param filters: the filters to be used in this analysis
     :param funnel_details: the dict with the details of the funnel
     :param prob_th: optional, the probability threshold to accept the hypothesis
-    :param detailed: optional, if `True` will return also the original numbers extracted from mixpanel
-    :return: an OrderedDict containing the processed data and (optionally, if `detailed=True`) the original data
+    :return: an OrderedDict containing the processed data
     """
     funnel_id = funnel_details['ID']
     from_date = funnel_details['From Date']
@@ -235,8 +233,7 @@ def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
         convs_ctrl = aggregated_data[control_group][c_field]['count']
         if convs_ctrl < 1:
             output_template = fill_template(comment="Too few data for control option!",
-                                            output_template=output_template, funnel_details=funnel_details,
-                                            detailed=detailed)
+                                            output_template=output_template, funnel_details=funnel_details)
             return output_template
         if control2_present:
             # control2
@@ -246,8 +243,7 @@ def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
             if convs_ctrl2 < 1:
                 print("uno")
                 output_template = fill_template(comment="Too few data for second control option!",
-                                                output_template=output_template, funnel_details=funnel_details,
-                                                detailed=detailed)
+                                                output_template=output_template, funnel_details=funnel_details)
                 return output_template
             else:
                 cr, prob = make_ab_analysis(imps_ctrl, convs_ctrl, imps_ctrl2, convs_ctrl2)
@@ -257,26 +253,22 @@ def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
                 else:
                     print("due")
                     output_template = fill_template(comment="Too few data for second control option!",
-                                                    output_template=output_template, funnel_details=funnel_details,
-                                                    detailed=detailed)
+                                                    output_template=output_template, funnel_details=funnel_details)
                     return output_template
         # Test
         imps_test = aggregated_data[test_group][i_field]['count']
         convs_test = aggregated_data[test_group][c_field]['count']
-        if detailed:
-            output_template['Control Impressions'] = imps_ctrl
-            output_template['Control Conversions'] = convs_ctrl
-            output_template['Test Impressions'] = imps_test
-            output_template['Test Conversions'] = convs_test
+        output_template['Control Impressions'] = imps_ctrl
+        output_template['Control Conversions'] = convs_ctrl
+        output_template['Test Impressions'] = imps_test
+        output_template['Test Conversions'] = convs_test
     except KeyError:
         output_template = fill_template(comment="Too few data!",
-                                        output_template=output_template, funnel_details=funnel_details,
-                                        detailed=detailed)
+                                        output_template=output_template, funnel_details=funnel_details)
         return output_template
     if convs_ctrl < 1 or convs_test < 1:
         output_template = fill_template(comment="Too few data!",
-                                        output_template=output_template, funnel_details=funnel_details,
-                                        detailed=detailed)
+                                        output_template=output_template, funnel_details=funnel_details)
         return output_template
     else:
         cr, prob = make_ab_analysis(imps_ctrl, convs_ctrl, imps_test, convs_test)
@@ -302,8 +294,7 @@ def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
         return output_template
 
 
-
-def get_combinations(filters: dict) -> dict:
+def get_combinations(filters: dict) -> list:
     unrolled_filters = [[discriminant + ':' + cohort for cohort in cohorts] for discriminant, cohorts in
                         filters.items()]
     combinations = np.array(np.meshgrid(*unrolled_filters)).T.reshape(-1, len(filters))

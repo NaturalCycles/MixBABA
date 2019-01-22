@@ -10,7 +10,7 @@ import numpy as np
 # parsing input arguments
 parser = ArgumentParser(description='Analyze AB funnels from Mixpanel')
 parser.add_argument("-v", "--verbosity", action="count", default=0,
-                    help="increase output verbosity (max: -vv)")
+                    help="increase output verbosity (max: -v)")
 parser.add_argument("-o", "--output", help="The form in which you want to get the output",
                     choices=["terminal", "csv", 'both'], default="terminal")
 parser.add_argument("-of", "--output_format", help="The format in which the output will be visualized/recorded",
@@ -30,10 +30,6 @@ api: MixpanelAPI = MixpanelAPI(token=args.key)
 flist_df = get_funnels_list(api)
 
 detailed_steps = False
-detailed_numbers = False
-if args.verbosity >= 2:
-    detailed_numbers = True
-    detailed_steps = True
 if args.verbosity >= 1:
     detailed_steps = True
 
@@ -61,8 +57,7 @@ for funnel_details in tqdm(funnels, desc="Funnels completition"):
     if detailed_steps:
         tqdm.write("--- --- Analyzing all data...")
     filters = {'None': 'All'}
-    result = analyze_funnel(api=api, filters=filters, funnel_details=funnel_details,
-                            detailed=detailed_numbers)
+    result = analyze_funnel(api=api, filters=filters, funnel_details=funnel_details)
     if detailed_steps:
         tqdm.write(f"--- --- --- --- {result['Comment']}")
     output.append(result)
@@ -76,8 +71,7 @@ for funnel_details in tqdm(funnels, desc="Funnels completition"):
                 if detailed_steps:
                     tqdm.write(f"--- --- --- Analyzing cohort {cohort}...")
                 filters2apply = {discriminant: cohort}
-                result = analyze_funnel(api=api, filters=filters2apply,
-                                        funnel_details=funnel_details, detailed=detailed_numbers)
+                result = analyze_funnel(api=api, filters=filters2apply, funnel_details=funnel_details)
 
                 if detailed_steps:
                     tqdm.write(f"--- --- --- --- {result['Comment']}")
@@ -88,8 +82,7 @@ for funnel_details in tqdm(funnels, desc="Funnels completition"):
             combinations = get_combinations(filters)
             for filters2apply in tqdm(combinations, desc="Crossing filters"):
                 # TODO: take memory of filters with too few data, it's useless to continue run on them
-                result = analyze_funnel(api=api, filters=filters2apply,
-                                        funnel_details=funnel_details, detailed=detailed_numbers)
+                result = analyze_funnel(api=api, filters=filters2apply, funnel_details=funnel_details)
                 output.append(result)
 
     # finally, returning the output
