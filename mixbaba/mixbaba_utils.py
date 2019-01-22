@@ -252,11 +252,11 @@ def analyze_funnel(api: MixpanelAPI, discriminant: str, cohort: str, funnel_deta
                 return output_template
             else:
                 cr, prob = make_ab_analysis(imps_ctrl, convs_ctrl, imps_ctrl2, convs_ctrl2)
-                if np.abs(prob - 0.5) < 0.35:  # 0.35 Number to be studied!!
+                if np.abs(prob - 0.5) < 0.4:  # 0.4 Number to be studied!!
                     imps_ctrl += imps_ctrl2
                     convs_ctrl += convs_ctrl2
                 else:
-                    output_template = fill_template(comment="Too few data for second control option!",
+                    output_template = fill_template(comment="The two control options are too different!",
                                                     output_template=output_template, funnel_details=funnel_details,
                                                     detailed=detailed)
                     return output_template
