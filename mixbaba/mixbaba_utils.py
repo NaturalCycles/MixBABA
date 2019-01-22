@@ -197,7 +197,6 @@ def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
     :param detailed: optional, if `True` will return also the original numbers extracted from mixpanel
     :return: an OrderedDict containing the processed data and (optionally, if `detailed=True`) the original data
     """
-    # TODO: add cross-filtering selection (ex. Goal together with Country, etc)
     funnel_id = funnel_details['ID']
     from_date = funnel_details['From Date']
     to_date = funnel_details['To Date']
@@ -206,19 +205,16 @@ def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
     by = funnel_details['By']
     ab_groups = funnel_details['AB Groups']
 
-    #filters = {discriminant: cohort}
-    for filter, cohorts in filters.items():
-
-    discriminant, cohort # e per i coressed filters, coas facciamo nella tabella?
+    discriminant = ""
+    cohort = ""
+    for i_f, (discriminant_, cohort_) in enumerate(filters.items()):
+        if i_f > 0:
+            discriminant += '+'
+            cohort += '+'
+        discriminant += discriminant_
+        cohort += cohort_
     output_template = OrderedDict({'Discriminant': discriminant, 'Cohort': cohort, 'CR improvement': 0,
                                    'Probability': 0, 'Comment': " "})
-    '''if '.' in discriminant:
-        # if the discriminant is a real one, composed by "family.discriminant"
-        discr_type, discr_val = discriminant.split(".")
-    else:
-        discr_type, discr_val = discriminant, discriminant
-    aggregated_data = get_mixpanel_data(api=api, funnel_id=funnel_id, from_date=from_date, to_date=to_date,
-                                        discriminant=discr_val, discr_type=discr_type, cohort=cohort, by=by)'''
 
     aggregated_data = get_mixpanel_data(api=api, funnel_id=funnel_id, from_date=from_date, to_date=to_date,
                                         filters=filters, by=by)
@@ -255,7 +251,7 @@ def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
                 return output_template
             else:
                 cr, prob = make_ab_analysis(imps_ctrl, convs_ctrl, imps_ctrl2, convs_ctrl2)
-                if np.abs(prob - 0.5) < 0.35:  # 0.35 Number to be studied!!
+                if np.abs(prob - 0.5) < 0.40:  # 0.45 Number to be studied!!
                     imps_ctrl += imps_ctrl2
                     convs_ctrl += convs_ctrl2
                 else:
@@ -304,3 +300,18 @@ def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
         output_template['CR improvement'] = cr
         output_template['Probability'] = prob
         return output_template
+
+
+
+def get_combinations(filters: dict) -> dict:
+    unrolled_filters = [[discriminant + ':' + cohort for cohort in cohorts] for discriminant, cohorts in
+                        filters.items()]
+    combinations = np.array(np.meshgrid(*unrolled_filters)).T.reshape(-1, len(filters))
+    comb_dicted = []
+    for comb in combinations:
+        tmb_comb = {}
+        for flt_val in comb:
+            tmp_flt, tmp_val = flt_val.split(":")
+            tmb_comb[tmp_flt] = tmp_val
+        comb_dicted.append(tmb_comb)
+    return comb_dicted

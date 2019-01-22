@@ -2,10 +2,10 @@
 
 from argparse import ArgumentParser
 import json
-from mixbaba.mixbaba_utils import MixpanelAPI, get_funnels_list, analyze_funnel
+from mixbaba.mixbaba_utils import MixpanelAPI, get_funnels_list, analyze_funnel, get_combinations
 from mixbaba.output_utils import return_output
 from tqdm import tqdm
-
+import numpy as np
 
 # parsing input arguments
 parser = ArgumentParser(description='Analyze AB funnels from Mixpanel')
@@ -45,7 +45,6 @@ if detailed_steps:
 with open(funnels_json, 'r') as file:
     funnels = json.load(file)
 
-
 for funnel_details in tqdm(funnels, desc="Funnels completition"):
     ID = funnel_details['ID']
 
@@ -61,7 +60,8 @@ for funnel_details in tqdm(funnels, desc="Funnels completition"):
     # the overall behavior (no filters applied)
     if detailed_steps:
         tqdm.write("--- --- Analyzing all data...")
-    result = analyze_funnel(api=api, discriminant='None', cohort='All', funnel_details=funnel_details,
+    filters = {'None': 'All'}
+    result = analyze_funnel(api=api, filters=filters, funnel_details=funnel_details,
                             detailed=detailed_numbers)
     if detailed_steps:
         tqdm.write(f"--- --- --- --- {result['Comment']}")
@@ -75,7 +75,8 @@ for funnel_details in tqdm(funnels, desc="Funnels completition"):
             for cohort in tqdm(cohorts, desc="Cohorts for this discriminant"):
                 if detailed_steps:
                     tqdm.write(f"--- --- --- Analyzing cohort {cohort}...")
-                result = analyze_funnel(api=api, discriminant=discriminant, cohort=cohort,
+                filters2apply = {discriminant: cohort}
+                result = analyze_funnel(api=api, filters=filters2apply,
                                         funnel_details=funnel_details, detailed=detailed_numbers)
 
                 if detailed_steps:
@@ -84,11 +85,12 @@ for funnel_details in tqdm(funnels, desc="Funnels completition"):
 
         if args.crossed_filters:
             # analyzing combinations of the filters
-            crossed_filters_list=[]
-            for discriminant, cohorts in filters.items():
-                crossed_filters_list.append()
-                filters = {discriminant: cohort}
-
+            combinations = get_combinations(filters)
+            for filters2apply in tqdm(combinations, desc="Crossing filters"):
+                # TODO: take memory of filters with too few data, it's useless to continue run on them
+                result = analyze_funnel(api=api, filters=filters2apply,
+                                        funnel_details=funnel_details, detailed=detailed_numbers)
+                output.append(result)
 
     # finally, returning the output
     ab_groups = funnel_details['AB Groups']
