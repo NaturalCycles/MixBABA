@@ -7,6 +7,7 @@ from scipy.stats import beta
 from mixbaba.beta_utils import calc_prob_between
 import numpy as np
 import warnings
+from tqdm import tqdm
 
 
 class MixpanelAPI(object):
@@ -163,7 +164,7 @@ def get_mixpanel_data(api: MixpanelAPI, funnel_id: int, from_date: str, to_date:
     return aggregate_mix_data(response_['data'])
 
 
-def return_zeros_brk(output_template: dict, ab_groups: dict) ->dict:
+'''def return_zeros_brk(output_template: dict, ab_groups: dict) ->dict:
     for ab_group in ab_groups.values():
         output_template[ab_group + " -- conversions details"] = "None"
     return output_template
@@ -178,12 +179,12 @@ def return_zeros_det(output_template: dict) ->dict:
 
 
 def fill_template(comment: str, output_template: OrderedDict, funnel_details: dict) -> OrderedDict:
-    output_template['Comment'] = comment
+    output_template['Comment'] += comment
     if 'Breakdowns' in funnel_details.keys():
         ab_groups = funnel_details['AB Groups']
         output_template = return_zeros_brk(output_template, ab_groups=ab_groups)
     # output_template = return_zeros_det(output_template)
-    return output_template
+    return output_template'''
 
 
 def extract_ab_group_names(extracted_ab):
@@ -225,6 +226,27 @@ def extract_ab_group_names(extracted_ab):
     return control_groups, test_groups
 
 
+def get_numbers(output_template: OrderedDict, where: dict, what: str, field: str, which: str) -> OrderedDict:
+    try:
+        num = where[what][field]['count']
+        output_template[which] = num
+    except KeyError:
+        output_template[which] = np.nan
+    return output_template
+
+
+def create_fg_names(filters: dict) -> (str, str):
+    discriminant = ""
+    cohort = ""
+    for i_f, (discriminant_, cohort_) in enumerate(filters.items()):
+        if i_f > 0:
+            discriminant += '+'
+            cohort += '+'
+        discriminant += discriminant_
+        cohort += cohort_
+    return discriminant, cohort
+
+
 def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
                    prob_th: float = 0.95) -> OrderedDict:
     """
@@ -243,92 +265,105 @@ def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
     by = funnel_details['By']
     manual_ab_names = True
     ab_groups = {}
-    try:
-        ab_groups = funnel_details['AB Groups']
-    except KeyError:
-        manual_ab_names = False
 
-    discriminant = ""
-    cohort = ""
-    for i_f, (discriminant_, cohort_) in enumerate(filters.items()):
-        if i_f > 0:
-            discriminant += '+'
-            cohort += '+'
-        discriminant += discriminant_
-        cohort += cohort_
+
+    discriminant, cohort = create_fg_names(filters)
+
     output_template = OrderedDict({'Discriminant': discriminant, 'Cohort': cohort, 'Comment': " "})
 
     aggregated_data = get_mixpanel_data(api=api, funnel_id=funnel_id, from_date=from_date, to_date=to_date,
                                         filters=filters, by=by)
 
+
+    try:
+        ab_groups = funnel_details['AB Groups']
+    except KeyError:
+        tqdm.write("III extracting group names..")
+        manual_ab_names = False
+
     # initialize as if we have not control2 group
-    control_group = 'None'
-    control2_group = 'None'
+    control_g_name = 'None'
+    control2_g_name = 'None'
     control2_present = False
     if manual_ab_names:
-        control_group = ab_groups['Control']
+        control_g_name = ab_groups['Control']
         # TODO foresee a manual selection of test groups
         _test_group = ab_groups['Test']
         test_groups = [_test_group]
         if "Control2" in ab_groups.keys():
-            control2_group = ab_groups['Control2']
+            control2_g_name = ab_groups['Control2']
             control2_present = True
     else:
+        # we have to extract the groups name
+
+        funnel_details['AB Groups'] = {}
+
         extracted_ab = aggregated_data.keys()
         control_groups, test_groups = extract_ab_group_names(extracted_ab)
+
+        # TODO: spawn control groups name based on the lists just created
+        control_g_name = 'control'
         if len(control_groups) > 2:
-            control_group = 'control'
-            control2_group = 'control2'
+            control2_g_name = 'control2'
             control2_present = True
 
-    try:
-        # control
-        imps_ctrl = aggregated_data[control_group][i_field]['count']
-        convs_ctrl = aggregated_data[control_group][c_field]['count']
-    except KeyError:
-        output_template = fill_template(comment="Too few data!",
-                                        output_template=output_template, funnel_details=funnel_details)
-        return output_template
-    if convs_ctrl < 1:
-        output_template = fill_template(comment="Too few data for control option!",
-                                        output_template=output_template, funnel_details=funnel_details)
-        return output_template
-    if control2_present:
-        # control2
-        imps_ctrl2 = aggregated_data[control2_group][i_field]['count']
-        convs_ctrl2 = aggregated_data[control2_group][c_field]['count']
+            funnel_details['AB Groups']['Control2'] = control2_g_name
 
-        if convs_ctrl2 < 1:
-            output_template = fill_template(comment="Too few data for second control option!",
-                                            output_template=output_template, funnel_details=funnel_details)
-            return output_template
-        else:
-            cr, prob = make_ab_analysis(imps_ctrl, convs_ctrl, imps_ctrl2, convs_ctrl2)
-            if np.abs(prob - 0.5) < 0.40:  # 0.40 Number to be studied!!
-                imps_ctrl += imps_ctrl2
-                convs_ctrl += convs_ctrl2
+        funnel_details['AB Groups']['Control'] = control_g_name
+
+        for i, test_g_name in enumerate(test_groups):
+            if i==0:
+                funnel_details['AB Groups']['Test'] = test_g_name
             else:
-                output_template = fill_template(comment="Too few data for second control option!",
-                                                output_template=output_template, funnel_details=funnel_details)
+                funnel_details['AB Groups']['Test%d'%(i+1)] = test_g_name
 
-                return output_template
 
-    output_template['Control Impressions'] = imps_ctrl
-    output_template['Control Conversions'] = convs_ctrl
-    comment = ""
+    which = "Control Impressions"
+    output_template = get_numbers(output_template=output_template, where=aggregated_data, what=control_g_name,
+                                  field=i_field, which=which)
+    imps_ctrl = output_template[which]
+
+    which = "Control Conversions"
+    output_template = get_numbers(output_template=output_template, where=aggregated_data, what=control_g_name,
+                                  field=c_field, which=which)
+    convs_ctrl = output_template[which]
+
+    if control2_present:
+
+        which = "Control2 Impressions"
+        output_template = get_numbers(output_template=output_template, where=aggregated_data, what=control2_g_name,
+                                      field=i_field, which=which)
+        imps_ctrl2 = output_template[which]
+
+        which = "Control2 Conversions"
+        output_template = get_numbers(output_template=output_template, where=aggregated_data, what=control2_g_name,
+                                      field=c_field, which=which)
+        convs_ctrl2 = output_template[which]
+
+        cr, prob = make_ab_analysis(imps_ctrl, convs_ctrl, imps_ctrl2, convs_ctrl2)
+        if np.abs(prob - 0.5) < 0.40:  # 0.40 Number to be studied!!
+            # the two control options are compatible, so we can sum up the numbers
+            imps_ctrl += imps_ctrl2
+            convs_ctrl += convs_ctrl2
+        else:
+            output_template['Comment'] = "The two control options appear different!"
+            return output_template
+
     # Tests groups
     for test_g_name in test_groups:
-        imps_test = aggregated_data[test_g_name][i_field]['count']
-        convs_test = aggregated_data[test_g_name][c_field]['count']
-        output_template['%s Impressions' % test_g_name] = imps_test
-        output_template['%s Conversions' % test_g_name] = convs_test
+        which = f"{test_g_name} Impressions"
+        output_template = get_numbers(output_template=output_template, where=aggregated_data, what=test_g_name,
+                                      field=i_field, which=which)
+        imps_test = output_template[which]
+
+        which = f"{test_g_name} Conversions"
+        output_template = get_numbers(output_template=output_template, where=aggregated_data, what=test_g_name,
+                                      field=c_field, which=which)
+        convs_test = output_template[which]
 
         if convs_test < 1:
-            comment += "Too few data for %s!" % test_g_name,
+            output_template['Comment'] += "No conversions for %s!" % test_g_name
             # TODO: check what happens with breakdowns!
-            # output_template = fill_template(comment="Too few data!",
-            #                                     output_template=output_template, funnel_details=funnel_details)
-            # output_template{}
         else:
             cr, prob = make_ab_analysis(imps_ctrl, convs_ctrl, imps_test, convs_test)
             if prob > prob_th:
