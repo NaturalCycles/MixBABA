@@ -1,27 +1,12 @@
 #! /usr/bin/python
-
-from argparse import ArgumentParser
 import json
 from mixbaba.mixbaba_utils import MixpanelAPI, get_funnels_list, analyze_funnel, get_combinations
 from mixbaba.output_utils import return_output
+from mixbaba.inputs import parse_args
 from tqdm import tqdm
-import numpy as np
 
-# parsing input arguments
-parser = ArgumentParser(description='Analyze AB funnels from Mixpanel')
-parser.add_argument("-v", "--verbosity", action="count", default=0,
-                    help="increase output verbosity (max: -v)")
-parser.add_argument("-o", "--output", help="The form in which you want to get the output",
-                    choices=["terminal", "csv", 'both'], default="terminal")
-parser.add_argument("-of", "--output_format", help="The format in which the output will be visualized/recorded",
-                    choices=["long", 'short'], default="short")
-parser.add_argument("-f", "--funnels", help="The JSON file with the details about the funnels to be analyzed",
-                    required=True)
-parser.add_argument("-k", "--key", help="The key to authenticate within Mixpanel",
-                    required=True)
-parser.add_argument("-x", "--crossed_filters", action='store_true', help="Whether or not run with filters combinations")
-
-args = parser.parse_args()
+args = parse_args
+args.parse_args()
 
 # opening Mixpanel API
 api: MixpanelAPI = MixpanelAPI(token=args.key)
@@ -47,29 +32,17 @@ for funnel_details in tqdm(funnels, desc="Funnels completition"):
     # getting the name of the funnel
     fun_name = flist_df.loc[ID]['name']
 
-    # sanity check
-    if ("AB Groups" not in funnel_details.keys()) or ('Control' not in funnel_details["AB Groups"].keys()) or \
-            ('Test' not in funnel_details["AB Groups"].keys()):
-        if detailed_steps:
-            tqdm.write("--- Assuming Control(s) and Test(s) groups follow the convention")
+    # initializing the list where results will be stored
     output = []
 
     # the overall behavior (no filters applied)
-    if detailed_steps:
-        tqdm.write("--- --- Analyzing all data...")
     filters = {'None': 'All'}
     result = analyze_funnel(api=api, filters=filters, funnel_details=funnel_details)
-    if detailed_steps:
-        tqdm.write(f"--- --- --- --- {result['Comment']}")
     output.append(result)
 
     filters = funnel_details['filters']
     for discriminant, cohorts in tqdm(filters.items(), desc="Discriminants for this funnel"):
-        if detailed_steps:
-            tqdm.write(f"--- --- Filtering by discriminant {discriminant}...")
         for cohort in tqdm(cohorts, desc="Cohorts for this discriminant"):
-            if detailed_steps:
-                tqdm.write(f"--- --- --- Analyzing cohort {cohort}...")
             filters2apply = {discriminant: cohort}
             result = analyze_funnel(api=api, filters=filters2apply, funnel_details=funnel_details)
 
@@ -81,7 +54,7 @@ for funnel_details in tqdm(funnels, desc="Funnels completition"):
         # analyzing combinations of the filters
         combinations = get_combinations(filters)
         for filters2apply in tqdm(combinations, desc="Crossing filters"):
-            # TODO: take memory of filters with too few data, it's useless to continue run on them
+            # TODO: maybe keep memory of filters with too few data, it's useless to continue run on them
             result = analyze_funnel(api=api, filters=filters2apply, funnel_details=funnel_details)
             output.append(result)
 

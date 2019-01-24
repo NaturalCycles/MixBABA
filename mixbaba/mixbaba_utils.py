@@ -7,8 +7,7 @@ from scipy.stats import beta
 from mixbaba.beta_utils import calc_prob_between
 import numpy as np
 import warnings
-from tqdm import tqdm
-
+from scipy.stats._continuous_distns import beta_gen
 
 class MixpanelAPI(object):
     endpoint = 'https://mixpanel.com/api'
@@ -19,10 +18,15 @@ class MixpanelAPI(object):
 
     def request(self, methods, params, http_method='GET', frmt='json'):
         """
-            methods - List of methods to be joined, e.g. ['events', 'properties', 'values']
-                      will give us http://mixpanel.com/api/2.0/events/properties/values/
-            params - Extra parameters associated with method
+        This function call the request to the Mixpanel API. Check  http://mixpanel.com/api/2.0/events/properties/values/
+
+        :param methods: List of methods to be joined, e.g. ['events', 'properties', 'values'] will give us
+        :param params: Extra parameters associated with method
+        :param http_method: self explaining
+        :param frmt: the format in which you wnat the output.
+        :return: what you asked
         """
+
         params['format'] = frmt
 
         request_url = '/'.join([self.endpoint, str(self.VERSION)] + methods)
@@ -57,6 +61,7 @@ class MixpanelAPI(object):
 def get_funnels_list(connector: MixpanelAPI) -> pd.DataFrame:
     """
     This function returns the whole list of funnels in a table containing the funnel ID and the funnel name
+
     :param connector: the connector to the Mixpanel service
     :return: a pandas DataFrame
     """
@@ -70,6 +75,7 @@ def get_funnels_list(connector: MixpanelAPI) -> pd.DataFrame:
 def aggregate_mix_data(answer: dict) -> dict:
     """
     This function refactor the mixpanel data to have a more consistent dict for our needs
+
     :param answer: the answer from mixpanel service, as dict
     :return: a dict containing the refactored data
     """
@@ -92,9 +98,11 @@ def aggregate_mix_data(answer: dict) -> dict:
     return aggregated
 
 
-def calc_uplift(beta_1, beta_2) -> float:
+def calc_uplift(beta_1: beta_gen, beta_2: beta_gen) -> float:
     """
-    This function calculate the relative uplift of the beta_2 over the beta_1.
+    This function calculate the relative uplift of the beta_2 PDF over the beta_1 PDF.
+    Note that the mean value of the PDFs is the number we need, not the peak value.
+
     :param beta_1: beta function (control)
     :param beta_2: beta function (test)
     :return: the relative uplift
@@ -106,6 +114,7 @@ def make_ab_analysis(imps_1: int, convs_1: int, imps_2: int, convs_2: int) -> (f
     """
     This function return the relative uplift of test w.r.t. control,
     and the probability for test to be greater than control
+
     :param imps_1: number of impressions for the sample 1
     :param convs_1:  number of conversions for the sample 1
     :param imps_2:  number of impressions for the sample 2
@@ -130,15 +139,16 @@ def make_ab_analysis(imps_1: int, convs_1: int, imps_2: int, convs_2: int) -> (f
 def get_mixpanel_data(api: MixpanelAPI, funnel_id: int, from_date: str, to_date: str, filters: {}, by: str) -> dict:
     """
     This function gather the data from Mixpanel using the API, eventually divided in cohort using a discriminant.
+
     :param api: the connector to the Mixpanel
     :param funnel_id: the funnel identifier
     :param from_date: self explaining, string formatted like "2018-01-28"
     :param to_date: self explaining
-    :param filters: a dict with the filters to be used in this operation
-     (ex. {'properties.assignment': 'control'}, or for no filters {'None': 'All'})
+    :param filters: the filters to be used (ex. {'properties.assignment': 'control'}, or for no filters {'None': 'All'})
     :param by: the string containing the value on which breakdown the cohorts
     :return: a dict with the data
     """
+
     # the aggregated data will be divided by 'assignment' property (i.e. control, test, etc)
     by_type, by_val = by.split(".")
     req_dict = {
@@ -164,40 +174,20 @@ def get_mixpanel_data(api: MixpanelAPI, funnel_id: int, from_date: str, to_date:
     return aggregate_mix_data(response_['data'])
 
 
-'''def return_zeros_brk(output_template: dict, ab_groups: dict) ->dict:
-    for ab_group in ab_groups.values():
-        output_template[ab_group + " -- conversions details"] = "None"
-    return output_template
-
-
-def return_zeros_det(output_template: dict) ->dict:
-    output_template['Control Impressions'] = 0
-    output_template['Control Conversions'] = 0
-    output_template['Test Impressions'] = 0
-    output_template['Test Conversions'] = 0
-    return output_template
-
-
-def fill_template(comment: str, output_template: OrderedDict, funnel_details: dict) -> OrderedDict:
-    output_template['Comment'] += comment
-    if 'Breakdowns' in funnel_details.keys():
-        ab_groups = funnel_details['AB Groups']
-        output_template = return_zeros_brk(output_template, ab_groups=ab_groups)
-    # output_template = return_zeros_det(output_template)
-    return output_template'''
-
-
-def extract_ab_group_names(extracted_ab):
+def extract_ab_group_names(extracted_ab) -> (list, list):
     """
-    This function extract the names of the control groups (up to 2) and test groups (up to five).
+    This function extract the names of the control groups (up to 2) and test groups (up to nine).
     Note that here the naming convention allows only keywords `control`, `controlN`, `test`, `testN`, with N integer
+
     :param extracted_ab: the list of the groups
     :return: two lists: one for the control groups, the other for the test groups
     """
+    max_test_groups = 9
     control_groups = []
     test_groups = []
 
     for group in extracted_ab:
+        # trying if the word 'control' exist in this group
         splitted_group_c = group.split('control')
         if len(splitted_group_c) > 1:
             if splitted_group_c[1] == '':
@@ -218,7 +208,7 @@ def extract_ab_group_names(extracted_ab):
                 else:
                     try:
                         gr_n = int(splitted_group_t[1])
-                        if gr_n > 5:
+                        if gr_n > max_test_groups:
                             warnings.warn("Ignoring the group %s" % group)
                         test_groups.append(group)
                     except ValueError:
@@ -227,6 +217,17 @@ def extract_ab_group_names(extracted_ab):
 
 
 def get_numbers(output_template: OrderedDict, where: dict, what: str, field: str, which: str) -> OrderedDict:
+    """
+    This function simply surrounds the number extraction with a try/except
+
+    :param output_template: the pre-filled OrderedDict where we are going to put the numbers
+    :param where: the dict containing the data we are going to extrract
+    :param what: the name of the group we are interested in (ex. "control", "test", "test2", etc.)
+    :param field: the name assigned to the field (ex. "AB-AB025-IMPRESSION", "Payment", etc.)
+    :param which: the name which will result as column name in the final report of MixBABA (ex. "Control Impressions")
+    :return: the updated OrderedDict
+    """
+
     try:
         num = where[what][field]['count']
         output_template[which] = num
@@ -236,6 +237,13 @@ def get_numbers(output_template: OrderedDict, where: dict, what: str, field: str
 
 
 def create_fg_names(filters: dict) -> (str, str):
+    """
+    This function simply create the names of the filter(s) which will be used in the final table
+
+    :param filters: a dict containing the filters in the format: {"user.goal": "PREVENT", "user.$country_code": "US"}
+    :return: two strings; following the example: "user.goal+user.$country_code", "PREVENT+US"
+    """
+
     discriminant = ""
     cohort = ""
     for i_f, (discriminant_, cohort_) in enumerate(filters.items()):
@@ -251,12 +259,15 @@ def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
                    prob_th: float = 0.95) -> OrderedDict:
     """
     This function gather the data, makes the analysis and output the result for the given funnel.
+
     :param api: the connector to the Mixpanel
     :param filters: the filters to be used in this analysis
     :param funnel_details: the dict with the details of the funnel
     :param prob_th: optional, the probability threshold to accept the hypothesis
     :return: an OrderedDict containing the processed data
     """
+
+    # extracting the relevant data
     funnel_id = funnel_details['ID']
     from_date = funnel_details['From Date']
     to_date = funnel_details['To Date']
@@ -266,7 +277,6 @@ def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
     manual_ab_names = True
     ab_groups = {}
 
-
     discriminant, cohort = create_fg_names(filters)
 
     output_template = OrderedDict({'Discriminant': discriminant, 'Cohort': cohort, 'Comment': " "})
@@ -274,20 +284,18 @@ def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
     aggregated_data = get_mixpanel_data(api=api, funnel_id=funnel_id, from_date=from_date, to_date=to_date,
                                         filters=filters, by=by)
 
-
     try:
         ab_groups = funnel_details['AB Groups']
     except KeyError:
-        tqdm.write("III extracting group names..")
+        # if the names of the groups are not inserted, we will extract them from the gathered data
         manual_ab_names = False
 
     # initialize as if we have not control2 group
-    control_g_name = 'None'
     control2_g_name = 'None'
     control2_present = False
     if manual_ab_names:
         control_g_name = ab_groups['Control']
-        # TODO foresee a manual selection of test groups
+        # TODO foresee a manual selection of other test groups
         _test_group = ab_groups['Test']
         test_groups = [_test_group]
         if "Control2" in ab_groups.keys():
@@ -312,11 +320,10 @@ def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
         funnel_details['AB Groups']['Control'] = control_g_name
 
         for i, test_g_name in enumerate(test_groups):
-            if i==0:
+            if i == 0:
                 funnel_details['AB Groups']['Test'] = test_g_name
             else:
-                funnel_details['AB Groups']['Test%d'%(i+1)] = test_g_name
-
+                funnel_details['AB Groups']['Test%d' % (i+1)] = test_g_name
 
     which = "Control Impressions"
     output_template = get_numbers(output_template=output_template, where=aggregated_data, what=control_g_name,
@@ -389,6 +396,12 @@ def analyze_funnel(api: MixpanelAPI, filters: dict, funnel_details: dict,
 
 
 def get_combinations(filters: dict) -> list:
+    """
+    Given that the cross-filtering option has been specified, this function create the combinations of the filters.
+
+    :param filters: a dict containing the filters
+    :return: a list with all the combinations
+    """
     unrolled_filters = [[discriminant + ':' + cohort for cohort in cohorts] for discriminant, cohorts in
                         filters.items()]
     combinations = np.array(np.meshgrid(*unrolled_filters)).T.reshape(-1, len(filters))
