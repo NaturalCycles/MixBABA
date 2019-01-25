@@ -1,3 +1,5 @@
+[![Documentation Status](https://readthedocs.org/projects/mixbaba/badge/?version=latest)](https://mixbaba.readthedocs.io/en/latest/?badge=latest)
+
 # MIXpanel Bayesian AB test Analysis tool (MixBABA)
 
 This tool is intended to consume a JSON file containing details about a Mixpanel funnel and output the results of the analysis made whithin a Bayesian framework.
