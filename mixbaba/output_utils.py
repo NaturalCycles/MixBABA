@@ -33,6 +33,7 @@ def return_long_output(what: list, where: str, f_id: int, ab_groups: dict, fun_n
         else:
             tqdm.write(f"Control group is: {print_form(ab_groups['Control'])}, "
                        f"test group is {print_form(ab_groups['Test'])}")
+        tqdm.write("\n")
         tqdm.write(tabulate(df, headers="keys", showindex=False))
     if where == "csv" or where == "both":
         filename = f'{f_id}-{fun_name}.csv'

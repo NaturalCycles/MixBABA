@@ -27,6 +27,10 @@ And then you can install the tool via PIP:
     pip install .
 
 ## Usage
+
+You can find the full documentation [here](https://mixbaba.readthedocs.io/en/latest/), 
+but if you want a short guide read the following.
+
 To use MixBABA you have need:
 * a JSON file containing a list of the funnels together with the details about them
  (an example is in this repository) 
@@ -41,22 +45,28 @@ The tool will extract the data relative to the funnel from Mixpanel,
 and the output will be put in the same directory as CSV files, 
 as many as the funnels specified in the JSON file given in input.
 
-By default no output will be sent to the console, but if you want
-to check the behavior you can specify a deeper level of verbosity:
+By default no output will be sent to the console. If you want a CSV file as output you can ask it with
 
-    mixbaba -vv -f [funnel_file.json] -k [API secret]
+    mixbaba -f [funnel_file.json] -k [API secret] -o csv
 
 ### Example result
 
-| Discriminant   | Cohort   |   CR improvement |   Probability | Comment                                           |
-|:---------------|:---------|-----------------:|--------------:|:--------------------------------------------------|
-| None           | All      |         0.649154 |      0.998485 | Result is OK!                                     |
-| goal           | PREVENT  |         0.947368 |      0.99296  | Result is OK!                                     |
-| goal           | PLAN     |         0.504785 |      0.894047 | Result is uncertain! Check data                   |
-| goal           | PREGNANT |         0        |      0        | Not enough statistic for the two control options! |
-| $country_code  | US       |         0.637771 |      0.997887 | Result is OK!                                     |
-| $country_code  | UK       |         0        |      0        | Too few data!                                     |
-| $country_code  | SE       |         0        |      0        | Too few data!                                     |
-| $country_code  | DE       |         0        |      0        | Too few data!                                     |
+This is the standard output format for the analysis of a funnel
 
-(experimental)
+| Group            |   Control Impressions |   Control Conversions |   test Impressions |   test Conversions |   test CR improvement |   test Probability |                                                                                                                     
+|:-----------------|----------------------:|----------------------:|-------------------:|-------------------:|----------------------:|-------------------:|
+| All.All          |                 34164 |                   253 |              31105 |                284 |              0.232387 |           0.992551 |
+| goal.PREVENT     |                  6175 |                    25 |               6016 |                 37 |              0.500153 |           0.947624 |
+| goal.PLAN        |                  1561 |                     5 |               1411 |                  5 |              0.106157 |           0.568093 |
+| $country_code.US |                 16631 |                   224 |              15438 |                242 |              0.163448 |           0.95048  |
+| $country_code.SE |                  8024 |                    23 |               7275 |                 35 |              0.654391 |           0.974175 |
+
+Or, if you specify the option `-of long` at the command launch:
+
+| Discriminant       | Cohort   | Comment                       |   Control Impressions |   Control Conversions |   test Impressions |   test Conversions |   test CR improvement |   test Probability |                                                                        
+|:-------------------|:---------|:------------------------------|----------------------:|----------------------:|-------------------:|-------------------:|----------------------:|-------------------:|
+| None               | All      | Result for test is OK!        |                 34164 |                   253 |              31105 |                284 |              0.232387 |           0.992551 |
+| user.goal          | PREVENT  | Result for test is uncertain. |                  6175 |                    25 |               6016 |                 37 |              0.500153 |           0.947624 |
+| user.goal          | PLAN     | Result for test is uncertain. |                  1561 |                     5 |               1411 |                  5 |              0.106157 |           0.568093 |
+| user.$country_code | US       | Result for test is OK!        |                 16631 |                   224 |              15438 |                242 |              0.163448 |           0.95048  |
+| user.$country_code | SE       | Result for test is OK!        |                  8024 |                    23 |               7275 |                 35 |              0.654391 |           0.974175 |
