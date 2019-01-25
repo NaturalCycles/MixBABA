@@ -5,8 +5,9 @@ from mixbaba.output_utils import return_output
 from mixbaba.inputs import parse_args
 from tqdm import tqdm
 
-args = parse_args
-args.parse_args()
+args = parse_args()
+args = args.parse_args()
+
 
 # opening Mixpanel API
 api: MixpanelAPI = MixpanelAPI(token=args.key)
@@ -40,7 +41,11 @@ for funnel_details in tqdm(funnels, desc="Funnels completition"):
     result = analyze_funnel(api=api, filters=filters, funnel_details=funnel_details)
     output.append(result)
 
-    filters = funnel_details['filters']
+    try:
+        filters = funnel_details['filters']
+    except KeyError:
+        filters = {}
+        # no filters are defined
     for discriminant, cohorts in tqdm(filters.items(), desc="Discriminants for this funnel"):
         for cohort in tqdm(cohorts, desc="Cohorts for this discriminant"):
             filters2apply = {discriminant: cohort}

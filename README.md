@@ -5,6 +5,14 @@ This tool is intended to consume a JSON file containing details about a Mixpanel
 You can find details about the data processing [here](https://towardsdatascience.com/bayesian-a-b-testing-with-python-the-easy-guide-d638f89e0b8a).
 
 ## Installation
+
+### From PyPi
+
+Just easy as:
+
+    pip install mixbaba
+
+### From sources
 To install this package you have to clone the repository:
 
     git clone https://github.com/NaturalCycles/MixBABA.git
